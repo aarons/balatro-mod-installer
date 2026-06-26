@@ -37,7 +37,7 @@ Lua). They differ only in how/where Lovely and the Mods folder go — see
 | Bunco | `Mods/Bunco/` | latest `main` |
 | All In Jest | `Mods/All-In-Jest/` | latest `main` |
 | BetterStakes | `Mods/BetterStakes/` | latest `main` |
-| NeowBlessings | `Mods/NeowBlessings/` | latest `main` |
+| NeowBlessings | `Mods/NeowBlessings/` | latest `main` (maintained [fork](https://github.com/aarons/Balatro-NeowBlessings)) |
 | Typist | `Mods/balatro-typist-mod/` | latest `main` |
 
 - **Lovely** is a compiled binary distributed only via GitHub Releases, so it's
@@ -56,6 +56,11 @@ Lua). They differ only in how/where Lovely and the Mods folder go — see
   behind their default branch, so "latest commit" is the most reliable "latest
   version". Each mod is placed in its own folder, with its `lovely/` patch
   files contained inside that folder (as Lovely requires).
+- **NeowBlessings** is installed from a [maintained fork](https://github.com/aarons/Balatro-NeowBlessings)
+  rather than the upstream `kjossul/NeowBlessings`. Upstream is unmaintained
+  (open issues/PRs ignored) and ships a global `create_joker` function that
+  collides with other mods (e.g. All-In-Jest), crashing when a joker blessing
+  is picked. The fork renames it to `neow_create_joker` to avoid the collision.
 
 > In `MODS_TABLE` (in the script) each mod's 4th field is either a branch name
 > (track that branch's latest commit) or the literal `@release` (track the

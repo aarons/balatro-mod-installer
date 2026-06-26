@@ -75,7 +75,7 @@ unik|70UNIK/UNIKs-mod|UNIKs-mod|main
 Bunco|jumbocarrot0/Bunco|Bunco|main
 AllInJest|survovoaneend/All-In-Jest|All-In-Jest|main
 BetterStakes|kjossul/BetterStakes|BetterStakes|main
-NeowBlessings|kjossul/NeowBlessings|NeowBlessings|main
+NeowBlessings|aarons/Balatro-NeowBlessings|NeowBlessings|main
 typist|kasimeka/balatro-typist-mod|balatro-typist-mod|main
 '
 
