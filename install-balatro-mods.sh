@@ -14,12 +14,14 @@
 # Requirements: macOS, curl, tar (all stock). No jq/python needed.
 # Optional: set GITHUB_TOKEN to raise the GitHub API rate limit (60 -> 5000/hr).
 #
-# Version policy: mods are installed from the HEAD of their default branch
+# Version policy: most mods are installed from the HEAD of their default branch
 # (the genuinely latest code). Most of these repos either have no installable
 # release asset or tag releases well behind their default branch, so tracking
-# the latest commit is the most reliable "latest version". Lovely is the one
-# exception: it ships a compiled binary only via GitHub Releases, so it is
-# installed from its latest release.
+# the latest commit is the most reliable "latest version".
+# Exceptions, both installed from their latest GitHub release:
+#   - Lovely: ships a compiled binary only via Releases.
+#   - Steamodded: its `main` is a development branch; the team recommends the
+#     latest release for content-mod compatibility (see MODS_TABLE below).
 #
 set -u
 
@@ -35,11 +37,17 @@ MODS_DIR="${BALATRO_MODS_DIR:-$DEFAULT_MODS_DIR}"
 
 LOVELY_REPO="ethangreen-dev/lovely-injector"
 
-# Source-installed mods. One record per line:  key|owner/repo|target-folder|branch
+# Source-installed mods. One record per line:  key|owner/repo|target-folder|ref
+# The ref is either a branch name (install the latest commit of that branch) or
+# the literal "@release" (install the source of the latest GitHub release).
 # Order: framework + common dependencies first, then content mods. (Load order
 # on disk does not actually matter to Steamodded, but it reads nicely.)
+#
+# Steamodded is pinned to @release: its `main` branch carries an in-progress
+# blind/scoring refactor that content mods haven't adopted yet, and the
+# Steamodded team recommends running the latest release for mod compatibility.
 MODS_TABLE='
-smods|Steamodded/smods|smods|main
+smods|Steamodded/smods|smods|@release
 Amulet|frostice482/amulet|Amulet|main
 JokerDisplay|nh6574/JokerDisplay|JokerDisplay|main
 Cryptid|SpectralPack/Cryptid|Cryptid|main
@@ -143,19 +151,27 @@ resolve_sha() {
   printf '%s' "$sha"
 }
 
-# Resolve Lovely's latest release tag. Prefers the github.com
+# Resolve a repo's latest release tag. Prefers the github.com
 # /releases/latest redirect (not rate-limited); falls back to the REST API.
-#   resolve_lovely_tag  -> tag on stdout (empty on failure)
-resolve_lovely_tag() {
-  local tag="" loc
-  loc="$(curl -sI -o /dev/null -w '%{redirect_url}' "https://github.com/$LOVELY_REPO/releases/latest" 2>/dev/null)"
+#   resolve_release_tag owner/repo  -> tag on stdout (empty on failure)
+resolve_release_tag() {
+  local repo="$1" tag="" loc
+  loc="$(curl -sI -o /dev/null -w '%{redirect_url}' "https://github.com/$repo/releases/latest" 2>/dev/null)"
   case "$loc" in
     */releases/tag/*) tag="${loc##*/tag/}"; tag="${tag%%[!A-Za-z0-9._-]*}" ;;
   esac
   if [ -z "$tag" ]; then
-    tag="$(api_get "https://api.github.com/repos/$LOVELY_REPO/releases/latest" 2>/dev/null | extract_str tag_name)"
+    tag="$(api_get "https://api.github.com/repos/$repo/releases/latest" 2>/dev/null | extract_str tag_name)"
   fi
   printf '%s' "$tag"
+}
+
+# Pretty-print a ref value: shorten 40-char commit SHAs, show release tags whole.
+dispv() {
+  case "$1" in
+    *[!0-9a-f]*) printf '%s' "$1" ;;                                  # has non-hex -> a tag
+    *) if [ ${#1} -gt 12 ]; then short "$1"; else printf '%s' "$1"; fi ;;  # all hex -> a SHA
+  esac
 }
 
 # Extract the first top-level "sha" hex value from a JSON body on stdin.
@@ -247,7 +263,7 @@ install_lovely() {
   local tag dll="$GAME_DIR/liblovely.dylib" sh="$GAME_DIR/run_lovely_macos.sh"
   local cur installed_present=0
 
-  tag="$(resolve_lovely_tag)"
+  tag="$(resolve_release_tag "$LOVELY_REPO")"
   if [ -z "$tag" ]; then
     fail "Lovely: could not resolve latest release (network / GitHub rate limit?)"
     N_FAIL=$((N_FAIL+1)); FAILED_LIST="$FAILED_LIST Lovely"; return
@@ -296,38 +312,49 @@ install_lovely() {
 }
 
 # ---------------------------------------------------------------------------
-# Source mods  (latest commit of default branch -> Mods/<folder>/)
+# Source mods  (branch HEAD or latest release source -> Mods/<folder>/)
 # ---------------------------------------------------------------------------
 
 install_source_mod() {
-  local key="$1" repo="$2" folder="$3" branch="$4"
-  local target="$MODS_DIR/$folder" sha cur present=0
+  local key="$1" repo="$2" folder="$3" ref_spec="$4"
+  local target="$MODS_DIR/$folder" ref cur present=0 url
 
-  sha="$(resolve_sha "$repo" "$branch")"
-  if [ -z "$sha" ]; then
-    fail "$key: could not resolve latest commit ($repo@$branch) — network / rate limit?"
-    N_FAIL=$((N_FAIL+1)); FAILED_LIST="$FAILED_LIST $key"; return
+  # Resolve the version (commit SHA for a branch, tag for @release) and the
+  # matching source-tarball URL.
+  if [ "$ref_spec" = "@release" ]; then
+    ref="$(resolve_release_tag "$repo")"
+    url="https://github.com/$repo/archive/refs/tags/$ref.tar.gz"
+    if [ -z "$ref" ]; then
+      fail "$key: could not resolve latest release ($repo) — network / rate limit?"
+      N_FAIL=$((N_FAIL+1)); FAILED_LIST="$FAILED_LIST $key"; return
+    fi
+  else
+    ref="$(resolve_sha "$repo" "$ref_spec")"
+    url="https://github.com/$repo/archive/$ref.tar.gz"
+    if [ -z "$ref" ]; then
+      fail "$key: could not resolve latest commit ($repo@$ref_spec) — network / rate limit?"
+      N_FAIL=$((N_FAIL+1)); FAILED_LIST="$FAILED_LIST $key"; return
+    fi
   fi
 
   cur="$(state_get "$key")"
   [ -d "$target" ] && present=1
 
   if [ "$MODE" = "status" ]; then
-    if [ "$present" = 1 ] && [ "$cur" = "$sha" ]; then ok  "$key ($(short "$sha")) [$folder]"
-    elif [ "$present" = 1 ];                       then upd "$key $(short "$cur") -> $(short "$sha") [$folder]"
-    else                                                add "$key (not installed) -> $(short "$sha")"; fi
+    if [ "$present" = 1 ] && [ "$cur" = "$ref" ]; then ok  "$key ($(dispv "$ref")) [$folder]"
+    elif [ "$present" = 1 ];                       then upd "$key $(dispv "$cur") -> $(dispv "$ref") [$folder]"
+    else                                                add "$key (not installed) -> $(dispv "$ref")"; fi
     return
   fi
 
-  if [ "$FORCE" = 0 ] && [ "$present" = 1 ] && [ "$cur" = "$sha" ]; then
-    ok "$key ($(short "$sha")) [$folder]"; N_OK=$((N_OK+1)); return
+  if [ "$FORCE" = 0 ] && [ "$present" = 1 ] && [ "$cur" = "$ref" ]; then
+    ok "$key ($(dispv "$ref")) [$folder]"; N_OK=$((N_OK+1)); return
   fi
 
   local was_new=1; [ "$present" = 1 ] && was_new=0
-  if [ "$was_new" = 1 ]; then add "$key -> $(short "$sha") [$folder]"
-  else upd "$key $(short "$cur") -> $(short "$sha") [$folder]"; fi
+  if [ "$was_new" = 1 ]; then add "$key -> $(dispv "$ref") [$folder]"
+  else upd "$key $(dispv "$cur") -> $(dispv "$ref") [$folder]"; fi
 
-  local url="https://github.com/$repo/archive/$sha.tar.gz"
   local tgz="$WORK_DIR/$key.tar.gz"
   local ex="$WORK_DIR/$key.extract"
 
@@ -351,7 +378,7 @@ install_source_mod() {
     N_FAIL=$((N_FAIL+1)); FAILED_LIST="$FAILED_LIST $key"; return
   fi
 
-  state_set "$key" "$sha"
+  state_set "$key" "$ref"
   if [ "$was_new" = 1 ]; then N_NEW=$((N_NEW+1)); else N_UPD=$((N_UPD+1)); fi
 }
 
@@ -366,9 +393,9 @@ install_lovely
 echo
 
 title "Mods  (Mods directory)"
-while IFS='|' read -r key repo folder branch; do
+while IFS='|' read -r key repo folder ref; do
   case "$key" in ''|\#*) continue ;; esac
-  install_source_mod "$key" "$repo" "$folder" "$branch"
+  install_source_mod "$key" "$repo" "$folder" "$ref"
 done < <(printf '%s\n' "$MODS_TABLE")
 
 # ---------------------------------------------------------------------------
