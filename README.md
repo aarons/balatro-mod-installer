@@ -66,6 +66,30 @@ Lua). They differ only in how/where Lovely and the Mods folder go — see
 > (track that branch's latest commit) or the literal `@release` (track the
 > latest GitHub release). Flip any mod between the two by editing that field.
 
+## Install locations
+
+Where each script puts things by default (these are the paths to inspect to find
+the locally-installed mods). Override with `BALATRO_GAME_DIR` / `BALATRO_MODS_DIR`
+or the `--game-dir` / `--mods-dir` flags.
+
+| | macOS | Steam Deck / Linux (Proton) |
+|---|---|---|
+| **Game dir** (`Balatro.app` / `Balatro.exe` + Lovely) | `~/Library/Application Support/Steam/steamapps/common/Balatro` | `~/.local/share/Steam/steamapps/common/Balatro` |
+| **Mods dir** (the `Mods/` folder, each mod in its own subfolder) | `~/Library/Application Support/Balatro/Mods` | `…/steamapps/compatdata/2379780/pfx/drive_c/users/steamuser/AppData/Roaming/Balatro/Mods` |
+
+- On **macOS** the Mods folder is under `Application Support/Balatro/`, **not**
+  next to the game — the two `Application Support` paths above are different
+  directories. So an installed mod lives at e.g.
+  `~/Library/Application Support/Balatro/Mods/Cryptid/`.
+- On **Steam Deck** the Mods folder is inside Balatro's Proton prefix (the
+  Windows `%AppData%` mapped into `compatdata/2379780/`). The script
+  auto-locates the game across all Steam libraries (including an SD card listed
+  in `libraryfolders.vdf`) and derives the Mods path from that same library, so
+  the root may differ if Balatro is installed on a secondary library.
+- The installed-version record for every component lives at
+  `Mods/.balatro-mod-installer.state` (see [How updates / status are
+  tracked](#how-updates--status-are-tracked)).
+
 ## Requirements
 
 - **macOS**: `curl`, `tar` (all stock). No `jq`/Python needed.
