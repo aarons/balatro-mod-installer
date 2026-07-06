@@ -32,6 +32,8 @@ Lua). They differ only in how/where Lovely and the Mods folder go — see
 | **Steamodded** (`smods`) | `Mods/smods/` | latest **release** |
 | Amulet | `Mods/Amulet/` | latest `main` |
 | JokerDisplay | `Mods/JokerDisplay/` | latest `main` |
+| Cartomancer | `Mods/Cartomancer/` | latest `main` |
+| Handy | `Mods/HandyBalatro/` | latest `main` |
 | Cryptid | `Mods/Cryptid/` | latest `main` |
 | UNIK | `Mods/UNIKs-mod/` | latest `main` |
 | Bunco | `Mods/Bunco/` | latest `main` |
@@ -192,3 +194,11 @@ If Balatro is on a custom path, override detection the same way as on macOS:
 - **Cryptid** requires Steamodded **and** Amulet — both are included above.
 - **Bunco**, **All In Jest**, **UNIK** and others require Steamodded; it's
   installed first.
+- **Cartomancer** is a performance/QoL mod for big runs: it can hide joker
+  cards (a large win at 100+ jokers, e.g. on Steam Deck), fixes a vanilla UI
+  memory leak, and adds joker stacking/scrolling. Configure it from its own
+  in-game options page.
+- **Handy** adds extra game-speed steps (adjustable in-run) and an
+  animation-skip toggle for instant scoring. Every feature can be toggled
+  individually in its in-game menu. Pairs well with the vanilla
+  **Reduced Motion** setting, which stops the constant card/joker wiggle.

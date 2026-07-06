@@ -50,6 +50,8 @@ MODS_TABLE='
 smods|Steamodded/smods|smods|@release
 Amulet|frostice482/amulet|Amulet|main
 JokerDisplay|nh6574/JokerDisplay|JokerDisplay|main
+Cartomancer|stupxd/Cartomancer|Cartomancer|main
+Handy|SleepyG11/HandyBalatro|HandyBalatro|main
 Cryptid|SpectralPack/Cryptid|Cryptid|main
 unik|70UNIK/UNIKs-mod|UNIKs-mod|main
 Bunco|jumbocarrot0/Bunco|Bunco|main
