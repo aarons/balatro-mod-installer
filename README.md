@@ -1,28 +1,43 @@
 # Balatro mod installer
 
 A single command that installs and updates a curated set of Balatro mods.
-Re-running it checks each component's installed version against the latest and
-only downloads what's missing or out of date. There are two independent,
-self-contained scripts — one per platform:
+Re-running it checks each component's installed version against the list and
+only downloads what's missing or out of date.
 
-| Script | Platform |
+## Architecture
+
+The repo has one data file and three kinds of programs, each with a single job:
+
+| File | Role |
 |---|---|
-| `install-balatro-mods.sh` | **macOS** (native build, Lovely `dylib`) |
-| `install-balatro-mods-steamdeck.sh` | **Steam Deck / Linux** (Proton, Lovely `version.dll`) |
+| `mods.csv` | **The mod list** — one line per mod with its GitHub repo, tracked ref, resolved version, and download URL. The single source of truth for both installers. |
+| `update-mods.sh` | **Version discovery** — resolves the latest version of every entry (branch HEAD or latest release) and rewrites the `version`/`url` columns of `mods.csv`. The only program that talks to the GitHub API. |
+| `install-balatro-mods.sh` | **macOS installer** (native build, Lovely `dylib`). Reads `mods.csv`, downloads, installs. No version discovery. |
+| `install-balatro-mods-steamdeck.sh` | **Steam Deck / Linux installer** (Proton, Lovely `version.dll`). Same, for the Proton setup. |
+| `share.sh` | **Transfer** — serves the repo over the LAN so a Steam Deck can curl the installer + `mods.csv`. |
+
+Typical maintenance flow:
 
 ```bash
+./update-mods.sh                     # resolve latest versions into mods.csv
+git diff mods.csv                    # review what moved
+git commit -am "chore: bump mod versions"
+
 ./install-balatro-mods.sh            # macOS:      install / update everything
 ./install-balatro-mods-steamdeck.sh  # Steam Deck:  install / update everything
 
-# both scripts take the same flags:
-#   --status   report what's installed vs available (no changes)
-#   --force    reinstall everything from scratch
+# both installers take the same flags:
+#   --status      report installed vs mods.csv (no changes)
+#   --force       reinstall everything from scratch
+#   --mods-file   use a different mod list (default: mods.csv next to the script)
 #   --help
+# update-mods.sh takes --check (report what would change, write nothing).
 ```
 
-The two scripts install the **same set of mods** (the mods are platform-agnostic
-Lua). They differ only in how/where Lovely and the Mods folder go — see
-[Steam Deck / Linux](#steam-deck--linux-proton) below for the Proton specifics.
+The two installers install the **same set of mods** (the mods are
+platform-agnostic Lua). They differ only in how/where Lovely and the Mods
+folder go — see [Steam Deck / Linux](#steam-deck--linux-proton) below for the
+Proton specifics.
 
 ## What it installs
 
@@ -64,9 +79,11 @@ Lua). They differ only in how/where Lovely and the Mods folder go — see
   collides with other mods (e.g. All-In-Jest), crashing when a joker blessing
   is picked. The fork renames it to `neow_create_joker` to avoid the collision.
 
-> In `MODS_TABLE` (in the script) each mod's 4th field is either a branch name
-> (track that branch's latest commit) or the literal `@release` (track the
-> latest GitHub release). Flip any mod between the two by editing that field.
+> In `mods.csv` each mod's `ref` field is either a branch name (track that
+> branch's latest commit) or the literal `@release` (track the latest GitHub
+> release). Flip any mod between the two by editing that field, then run
+> `./update-mods.sh` to re-resolve. To add a mod, add a line with its
+> `name,type,repo,ref,folder` and blank `version,url` — the updater fills them.
 
 ## Install locations
 
@@ -94,24 +111,29 @@ or the `--game-dir` / `--mods-dir` flags.
 
 ## Requirements
 
-- **macOS**: `curl`, `tar` (all stock). No `jq`/Python needed.
-- **Steam Deck / Linux**: `curl`, `tar`, and one of `unzip` / `bsdtar` /
-  `python3` to unpack Lovely's Windows `.zip` (all stock on SteamOS).
-- `git` is used (via `git ls-remote`) to resolve the latest version without
-  hitting GitHub's REST API rate limit. If `git` isn't installed (it's not in
-  the SteamOS base image) it falls back to the REST API (anonymous: 60
-  requests/hour — fine for a single run of ~12 lookups). Set `GITHUB_TOKEN` to
-  raise that limit if needed.
+- **Installers — macOS**: `curl`, `tar` (all stock), plus `mods.csv` next to
+  the script. No `jq`/Python/`git` needed.
+- **Installers — Steam Deck / Linux**: `curl`, `tar`, one of `unzip` /
+  `bsdtar` / `python3` to unpack Lovely's Windows `.zip` (all stock on
+  SteamOS), plus `mods.csv` next to the script.
+- **`update-mods.sh`**: `curl`; prefers `git` (via `git ls-remote`) to resolve
+  branch versions without hitting GitHub's REST API rate limit, falling back
+  to the REST API (anonymous: 60 requests/hour — fine for a single run of ~12
+  lookups; set `GITHUB_TOKEN` to raise it). The installers themselves never
+  touch the GitHub API.
 
 ## How updates / status are tracked
 
 The installed version of each component (a commit SHA, or a release tag)
-is recorded in `Mods/.balatro-mod-installer.state`. On each run the script
-resolves the latest version and compares:
+is recorded in `Mods/.balatro-mod-installer.state`. On each run the installer
+compares it against the version pinned in `mods.csv`:
 
 - folder missing → **install**
-- recorded version ≠ latest → **update** (folder is replaced atomically)
-- recorded version == latest and folder present → **up to date**, skipped
+- recorded version ≠ mods.csv → **update** (folder is replaced atomically)
+- recorded version == mods.csv and folder present → **up to date**, skipped
+
+"Latest" therefore means "latest as of the last `./update-mods.sh` run" — the
+installers are fully deterministic given a `mods.csv`.
 
 > Updating replaces a mod's folder with the latest version. If you've hand-edited
 > a mod's in-folder config, it will be reset to that mod's default.
@@ -142,8 +164,9 @@ sh "$HOME/Library/Application Support/Steam/steamapps/common/Balatro/run_lovely_
 
 ## Steam Deck / Linux (Proton)
 
-Use `install-balatro-mods-steamdeck.sh`. Copy it to the Deck (e.g. into your home
-folder), then in **Desktop Mode** open Konsole and run:
+Use `install-balatro-mods-steamdeck.sh`. Copy it **and `mods.csv`** to the Deck
+(e.g. into your home folder — run `./share.sh` on the Mac and it prints the
+exact `curl` commands), then in **Desktop Mode** open Konsole and run:
 
 ```bash
 chmod +x install-balatro-mods-steamdeck.sh

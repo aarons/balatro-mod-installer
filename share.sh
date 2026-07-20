@@ -20,6 +20,7 @@ set -u
 
 PORT="${1:-8000}"
 INSTALLER="install-balatro-mods-steamdeck.sh"
+MODS_FILE="mods.csv"
 
 # Serve from the directory this script lives in (the repo), regardless of CWD.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -55,6 +56,11 @@ command -v python3 >/dev/null 2>&1 || {
   exit 1
 }
 
+[ -f "$MODS_FILE" ] || {
+  fail "$MODS_FILE not found in $SCRIPT_DIR -- the installer needs it."
+  exit 1
+}
+
 # ---------------------------------------------------------------------------
 # Discover this machine's LAN IP address
 # ---------------------------------------------------------------------------
@@ -80,7 +86,7 @@ IP="$(get_ip)"
 # Print the Steam Deck instructions
 # ---------------------------------------------------------------------------
 
-URL="http://$IP:$PORT/$INSTALLER"
+BASE="http://$IP:$PORT"
 
 echo
 hr
@@ -92,17 +98,16 @@ note "(Deck must be on the same Wi-Fi/network as this Mac.)"
 echo
 printf '  %s1.%s Switch to Desktop Mode, then open %sKonsole%s.\n' "$C_BOLD" "$C_RESET" "$C_BOLD" "$C_RESET"
 echo
-printf '  %s2.%s Download and run the installer:\n' "$C_BOLD" "$C_RESET"
+printf '  %s2.%s Download the installer + mod list, then run it:\n' "$C_BOLD" "$C_RESET"
 echo
-printf '       %scurl -fO %s \\\n' "$C_GREEN" "$URL"
+printf '       %scurl -fO %s/%s \\\n' "$C_GREEN" "$BASE" "$INSTALLER"
+printf '         && curl -fO %s/%s \\\n' "$BASE" "$MODS_FILE"
 printf '         && bash %s%s\n' "$INSTALLER" "$C_RESET"
 echo
+note "(mods.csv must sit next to the installer -- it holds the mod list.)"
 note "Add installer flags after the filename, e.g.:"
 note "  bash $INSTALLER --status      # report only, change nothing"
 note "  bash $INSTALLER --force       # reinstall everything"
-echo
-note "Prefer a one-liner? This also works (no flags):"
-note "  curl -f $URL | bash"
 echo
 hr
 title "Server running -- press ${C_BOLD}Ctrl-C${C_RESET} to stop sharing."

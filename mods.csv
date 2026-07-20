@@ -1,0 +1,43 @@
+# Balatro mod list — the single source of truth for both installers.
+#
+# One record per line:  name,type,repo,ref,folder,version,url
+#   name    : display name / state-file key (must be unique)
+#   type    : "injector" — Lovely, a compiled release binary installed into the
+#             game directory; its url keeps an {asset} placeholder that each
+#             installer fills with its platform's asset filename.
+#             "mod"      — plain Lua mod installed from a source tarball into
+#             Mods/<folder>/.
+#   repo    : GitHub owner/repo (used by update-mods.sh to resolve versions)
+#   ref     : branch name (track that branch's latest commit) or "@release"
+#             (track the latest GitHub release). Flip a mod between the two by
+#             editing this field, then run ./update-mods.sh.
+#   folder  : target folder under Mods/ ("-" for the injector)
+#   version : resolved commit SHA or release tag   — written by ./update-mods.sh
+#   url     : resolved download endpoint           — written by ./update-mods.sh
+#
+# The installers read ONLY version + url (+ folder/type); they never talk to
+# the GitHub API. To pick up new upstream versions run ./update-mods.sh and
+# commit the diff.
+#
+# Version policy: most mods track the HEAD of their default branch — these
+# repos either ship no installable release asset or tag releases well behind
+# their branch. Exceptions, both tracked via @release:
+#   - lovely: ships a compiled binary only via GitHub Releases.
+#   - smods (Steamodded): its `main` is a development branch carrying an
+#     in-progress blind/scoring refactor content mods haven't adopted yet; the
+#     Steamodded team recommends the latest release for mod compatibility.
+#
+# Order: injector, then framework + common dependencies, then content mods.
+lovely,injector,ethangreen-dev/lovely-injector,@release,-,v0.9.0,https://github.com/ethangreen-dev/lovely-injector/releases/download/v0.9.0/{asset}
+smods,mod,Steamodded/smods,@release,smods,1.0.0-beta-1814a,https://github.com/Steamodded/smods/archive/refs/tags/1.0.0-beta-1814a.tar.gz
+Amulet,mod,frostice482/amulet,main,Amulet,4cebc19e5295f98ab265e3e72d9ff0b6a572f0ee,https://github.com/frostice482/amulet/archive/4cebc19e5295f98ab265e3e72d9ff0b6a572f0ee.tar.gz
+JokerDisplay,mod,nh6574/JokerDisplay,main,JokerDisplay,0fb373d0ee0f752dcc76c6a68756a3f4a1e3ab52,https://github.com/nh6574/JokerDisplay/archive/0fb373d0ee0f752dcc76c6a68756a3f4a1e3ab52.tar.gz
+Cartomancer,mod,stupxd/Cartomancer,main,Cartomancer,1c4ac70db5ee8937a5b78f61e9b4b2e5de406950,https://github.com/stupxd/Cartomancer/archive/1c4ac70db5ee8937a5b78f61e9b4b2e5de406950.tar.gz
+Handy,mod,SleepyG11/HandyBalatro,main,HandyBalatro,c65713d42cffdc89a8a7dd972c6bc02e14497210,https://github.com/SleepyG11/HandyBalatro/archive/c65713d42cffdc89a8a7dd972c6bc02e14497210.tar.gz
+Cryptid,mod,SpectralPack/Cryptid,main,Cryptid,5e3db93831467d61aa702c58831626e3da14923a,https://github.com/SpectralPack/Cryptid/archive/5e3db93831467d61aa702c58831626e3da14923a.tar.gz
+unik,mod,70UNIK/UNIKs-mod,main,UNIKs-mod,81ec8e0d2a6987a8661378fe40ba7ee5269409f7,https://github.com/70UNIK/UNIKs-mod/archive/81ec8e0d2a6987a8661378fe40ba7ee5269409f7.tar.gz
+Bunco,mod,jumbocarrot0/Bunco,main,Bunco,c78e90ecb3860b2e6229272fc7f33d23987b66bc,https://github.com/jumbocarrot0/Bunco/archive/c78e90ecb3860b2e6229272fc7f33d23987b66bc.tar.gz
+AllInJest,mod,survovoaneend/All-In-Jest,main,All-In-Jest,8d54a6b03338568addb52c2a651c9d67e12c339e,https://github.com/survovoaneend/All-In-Jest/archive/8d54a6b03338568addb52c2a651c9d67e12c339e.tar.gz
+BetterStakes,mod,kjossul/BetterStakes,main,BetterStakes,23c1c54652c36142fec2c56b54b051f7305caf68,https://github.com/kjossul/BetterStakes/archive/23c1c54652c36142fec2c56b54b051f7305caf68.tar.gz
+NeowBlessings,mod,aarons/Balatro-NeowBlessings,main,NeowBlessings,22704289a6938f948feaaf621ace703a71360b16,https://github.com/aarons/Balatro-NeowBlessings/archive/22704289a6938f948feaaf621ace703a71360b16.tar.gz
+typist,mod,kasimeka/balatro-typist-mod,main,balatro-typist-mod,bceaeff760128072f77394539f382e585fa6efd3,https://github.com/kasimeka/balatro-typist-mod/archive/bceaeff760128072f77394539f382e585fa6efd3.tar.gz
