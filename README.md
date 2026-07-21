@@ -14,7 +14,7 @@ The repo has one data file and three kinds of programs, each with a single job:
 | `update-mods.sh` | **Version discovery** — resolves the latest version of every entry (branch HEAD or latest release) and rewrites the `version`/`url` columns of `mods.csv`. The only program that talks to the GitHub API. |
 | `install-balatro-mods.sh` | **macOS installer** (native build, Lovely `dylib`). Reads `mods.csv`, downloads, installs. No version discovery. |
 | `install-balatro-mods-steamdeck.sh` | **Steam Deck / Linux installer** (Proton, Lovely `version.dll`). Same, for the Proton setup. |
-| `share.sh` | **Transfer** — serves the repo over the LAN so a Steam Deck can curl the installer + `mods.csv`. |
+| `share.sh` | **Transfer** — serves the repo over the LAN; the Steam Deck curls the installer once, and the installer fetches `mods.csv` from this server on every run. |
 
 Typical maintenance flow:
 
@@ -115,7 +115,7 @@ or the `--game-dir` / `--mods-dir` flags.
   the script. No `jq`/Python/`git` needed.
 - **Installers — Steam Deck / Linux**: `curl`, `tar`, one of `unzip` /
   `bsdtar` / `python3` to unpack Lovely's Windows `.zip` (all stock on
-  SteamOS), plus `mods.csv` next to the script.
+  SteamOS). `mods.csv` is fetched from the share endpoint automatically.
 - **`update-mods.sh`**: `curl`; prefers `git` (via `git ls-remote`) to resolve
   branch versions without hitting GitHub's REST API rate limit, falling back
   to the REST API (anonymous: 60 requests/hour — fine for a single run of ~12
@@ -164,14 +164,22 @@ sh "$HOME/Library/Application Support/Steam/steamapps/common/Balatro/run_lovely_
 
 ## Steam Deck / Linux (Proton)
 
-Use `install-balatro-mods-steamdeck.sh`. Copy it **and `mods.csv`** to the Deck
-(e.g. into your home folder — run `./share.sh` on the Mac and it prints the
-exact `curl` commands), then in **Desktop Mode** open Konsole and run:
+Use `install-balatro-mods-steamdeck.sh`. Run `./share.sh` on the Mac, then in
+**Desktop Mode** on the Deck open Konsole and run the one-liner it prints:
 
 ```bash
-chmod +x install-balatro-mods-steamdeck.sh
-./install-balatro-mods-steamdeck.sh            # install / update everything
-./install-balatro-mods-steamdeck.sh --status   # report only
+curl -fO http://<mac-ip>:8000/install-balatro-mods-steamdeck.sh \
+  && bash install-balatro-mods-steamdeck.sh
+```
+
+The installer fetches `mods.csv` from the share endpoint by itself (hardcoded
+default `http://192.168.1.16:8000`; override with `--share-url` or
+`BALATRO_SHARE_URL`) and caches it next to the script, so re-running works even
+if the Mac is offline — it just uses the last-fetched list. Useful flags:
+
+```bash
+bash install-balatro-mods-steamdeck.sh --status   # report only
+bash install-balatro-mods-steamdeck.sh --force    # reinstall everything
 ```
 
 On Linux there is **no native Balatro build** — Steam runs the *Windows* game

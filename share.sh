@@ -22,6 +22,10 @@ PORT="${1:-8000}"
 INSTALLER="install-balatro-mods-steamdeck.sh"
 MODS_FILE="mods.csv"
 
+# The endpoint hardcoded in the Steam Deck installer. If this machine's actual
+# address differs, the printed command includes a --share-url override.
+DEFAULT_ENDPOINT="http://192.168.1.16:8000"
+
 # Serve from the directory this script lives in (the repo), regardless of CWD.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR" || { echo "could not cd to $SCRIPT_DIR"; exit 1; }
@@ -98,13 +102,18 @@ note "(Deck must be on the same Wi-Fi/network as this Mac.)"
 echo
 printf '  %s1.%s Switch to Desktop Mode, then open %sKonsole%s.\n' "$C_BOLD" "$C_RESET" "$C_BOLD" "$C_RESET"
 echo
-printf '  %s2.%s Download the installer + mod list, then run it:\n' "$C_BOLD" "$C_RESET"
+printf '  %s2.%s Download the installer and run it:\n' "$C_BOLD" "$C_RESET"
 echo
-printf '       %scurl -fO %s/%s \\\n' "$C_GREEN" "$BASE" "$INSTALLER"
-printf '         && curl -fO %s/%s \\\n' "$BASE" "$MODS_FILE"
-printf '         && bash %s%s\n' "$INSTALLER" "$C_RESET"
+EXTRA_FLAGS=""
+[ "$BASE" != "$DEFAULT_ENDPOINT" ] && EXTRA_FLAGS=" --share-url $BASE"
+printf '       %scurl -fO %s/%s && bash %s%s%s\n' \
+  "$C_GREEN" "$BASE" "$INSTALLER" "$INSTALLER" "$EXTRA_FLAGS" "$C_RESET"
 echo
-note "(mods.csv must sit next to the installer -- it holds the mod list.)"
+note "(The installer fetches $MODS_FILE from this server by itself.)"
+if [ -n "$EXTRA_FLAGS" ]; then
+  note "NOTE: this machine is not at $DEFAULT_ENDPOINT (the installer's default),"
+  note "so the command passes --share-url with the current address."
+fi
 note "Add installer flags after the filename, e.g.:"
 note "  bash $INSTALLER --status      # report only, change nothing"
 note "  bash $INSTALLER --force       # reinstall everything"
