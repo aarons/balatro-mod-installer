@@ -12,10 +12,13 @@
 # on the machine that maintains the repo) refreshes mods.csv.
 # Re-running is safe: it compares the installed version of each component
 # against mods.csv and only downloads what is missing or stale.
+# Folders in the Mods directory that aren't listed in mods.csv are REMOVED,
+# so mods dropped from the list don't linger (pass --keep-extra to keep them).
 #
 #   ./install-balatro-mods-steamdeck.sh            # install/update everything in mods.csv
 #   ./install-balatro-mods-steamdeck.sh --status   # report only, change nothing
 #   ./install-balatro-mods-steamdeck.sh --force    # reinstall everything from scratch
+#   ./install-balatro-mods-steamdeck.sh --keep-extra   # don't remove unlisted mod folders
 #   ./install-balatro-mods-steamdeck.sh --share-url http://<ip>:<port>   # other endpoint
 #   ./install-balatro-mods-steamdeck.sh --help
 #
@@ -68,11 +71,13 @@ MODS_FILE_LOCAL=0; [ -n "${BALATRO_MODS_FILE:-}" ] && MODS_FILE_LOCAL=1
 
 MODE="install"   # install | status
 FORCE=0
+KEEP_EXTRA=0
 
 while [ $# -gt 0 ]; do
   case "$1" in
     --status|--check) MODE="status" ;;
     --force) FORCE=1 ;;
+    --keep-extra) KEEP_EXTRA=1 ;;
     --game-dir) shift; GAME_DIR="${1:-}" ;;
     --mods-dir) shift; MODS_DIR="${1:-}" ;;
     --mods-file) shift; MODS_FILE="${1:-}"; MODS_FILE_LOCAL=1 ;;
@@ -103,11 +108,12 @@ title() { printf '%s\n' "${C_BOLD}$*${C_RESET}"; }
 ok()    { printf '  %s[ok]%s   %s\n'    "$C_GREEN"  "$C_RESET" "$*"; }
 upd()   { printf '  %s[up]%s   %s\n'    "$C_BLUE"   "$C_RESET" "$*"; }
 add()   { printf '  %s[new]%s  %s\n'    "$C_YELLOW" "$C_RESET" "$*"; }
+del()   { printf '  %s[del]%s  %s\n'    "$C_RED"    "$C_RESET" "$*"; }
 fail()  { printf '  %s[ERR]%s  %s\n'    "$C_RED"    "$C_RESET" "$*"; }
 note()  { printf '         %s%s%s\n'    "$C_DIM"    "$*" "$C_RESET"; }
 
 # Counters
-N_OK=0; N_NEW=0; N_UPD=0; N_FAIL=0
+N_OK=0; N_NEW=0; N_UPD=0; N_FAIL=0; N_DEL=0
 FAILED_LIST=""
 
 record_fail() { fail "$*"; N_FAIL=$((N_FAIL+1)); FAILED_LIST="$FAILED_LIST ${*%%:*}"; }
@@ -449,6 +455,38 @@ install_source_mod() {
 }
 
 # ---------------------------------------------------------------------------
+# Prune  (Mods/<folder>/ dirs no longer listed in mods.csv)
+# ---------------------------------------------------------------------------
+
+# Remove any visible directory under MODS_DIR whose name isn't a `folder` in
+# mods.csv. Dotfiles/dot-dirs (installer state, temp dir) are skipped by the
+# glob, and `lovely` is kept — the injector writes its logs/dumps there.
+prune_unmanaged() {
+  local managed d base
+  managed="$(csv_rows | awk -F',' '$2 == "mod" { print $5 }')"
+
+  for d in "$MODS_DIR"/*/; do
+    [ -d "$d" ] || continue
+    base="${d%/}"; base="${base##*/}"
+    [ "$base" = "lovely" ] && continue
+    printf '%s\n' "$managed" | grep -qxF "$base" && continue
+
+    if [ "$MODE" = "status" ]; then
+      del "$base (not in mods.csv — would be removed)"
+    elif [ "$KEEP_EXTRA" = 1 ]; then
+      note "keeping unlisted folder: $base (--keep-extra)"
+    else
+      if rm -rf "$MODS_DIR/$base"; then
+        del "$base (removed — not in mods.csv)"
+        N_DEL=$((N_DEL+1))
+      else
+        record_fail "$base: could not remove $MODS_DIR/$base"
+      fi
+    fi
+  done
+}
+
+# ---------------------------------------------------------------------------
 # Run
 # ---------------------------------------------------------------------------
 
@@ -478,6 +516,11 @@ while IFS=',' read -r name type repo ref folder version url; do
   fi
   install_source_mod "$name" "$folder" "$version" "$url"
 done < <(csv_rows)
+echo
+
+title "Cleanup  (folders not in mods.csv)"
+prune_unmanaged
+[ "$N_DEL" = 0 ] && [ "$MODE" != "status" ] && note "nothing to remove"
 
 # ---------------------------------------------------------------------------
 # Summary
@@ -489,10 +532,11 @@ if [ "$MODE" = "status" ]; then
   title "Status check complete (no changes made)."
 else
   title "Done."
-  printf '  %sinstalled%s %d   %supdated%s %d   %sup-to-date%s %d   %sfailed%s %d\n' \
+  printf '  %sinstalled%s %d   %supdated%s %d   %sup-to-date%s %d   %sremoved%s %d   %sfailed%s %d\n' \
     "$C_YELLOW" "$C_RESET" "$N_NEW" \
     "$C_BLUE"   "$C_RESET" "$N_UPD" \
     "$C_GREEN"  "$C_RESET" "$N_OK" \
+    "$C_RED"    "$C_RESET" "$N_DEL" \
     "$C_RED"    "$C_RESET" "$N_FAIL"
   [ -n "$FAILED_LIST" ] && note "failed:$FAILED_LIST"
 fi

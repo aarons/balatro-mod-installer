@@ -2,7 +2,9 @@
 
 A single command that installs and updates a curated set of Balatro mods.
 Re-running it checks each component's installed version against the list and
-only downloads what's missing or out of date.
+only downloads what's missing or out of date. Mod folders that aren't in the
+list are removed from the Mods directory, so mods dropped from `mods.csv`
+(or installed by hand) don't linger — pass `--keep-extra` to keep them.
 
 ## Architecture
 
