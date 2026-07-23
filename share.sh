@@ -3,8 +3,9 @@
 # share.sh
 #
 # ONE-TIME bootstrap transfer: serve this repo over the LAN so a Steam Deck
-# can curl update.sh (the static updater). After that first transfer the Deck
-# never needs this again -- update.sh fetches everything from GitHub.
+# can curl install.sh without typing a long GitHub URL. After that first
+# transfer the Deck never needs this again -- install.sh fetches the mod list
+# (and updates to itself) from GitHub on every run.
 # Run it on your Mac (in the repo dir), then follow the printed instructions
 # on the Deck. The HTTP server runs in the FOREGROUND -- press Ctrl-C (or
 # kill this script) and the server stops with it. Nothing is left running.
@@ -21,7 +22,7 @@ set -u
 # ---------------------------------------------------------------------------
 
 PORT="${1:-8000}"
-UPDATER="update.sh"
+UPDATER="install.sh"
 
 # Serve from the directory this script lives in (the repo), regardless of CWD.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -99,10 +100,10 @@ echo
 printf '       %scurl -fO %s/%s && chmod +x %s && ./%s%s\n' \
   "$C_GREEN" "$BASE" "$UPDATER" "$UPDATER" "$UPDATER" "$C_RESET"
 echo
-note "(update.sh fetches everything else -- scripts and mod list -- from"
+note "(install.sh fetches the mod list -- and updates to itself -- from"
 note "GitHub, so this transfer is only needed ONCE. From then on, updating"
-note "is just ./update.sh on the Deck; this server need not be running.)"
-note "Flags pass through to the installer, e.g.:"
+note "is just ./install.sh on the Deck; this server need not be running.)"
+note "Useful flags:"
 note "  ./$UPDATER --status      # report only, change nothing"
 note "  ./$UPDATER --force       # reinstall everything"
 echo

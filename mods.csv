@@ -1,50 +1,46 @@
-# Balatro mod list — the single source of truth for both installers.
+# Balatro mod list — hand-edited; install.sh resolves versions at run time.
 #
-# One record per line:  name,type,repo,ref,folder,version,url
-#   name    : display name / state-file key (must be unique)
-#   type    : "injector" — Lovely, a compiled release binary installed into the
-#             game directory; its url keeps an {asset} placeholder that each
-#             installer fills with its platform's asset filename.
-#             "mod"      — plain Lua mod installed from a source tarball into
-#             Mods/<folder>/.
-#   repo    : GitHub owner/repo (used by update-mods.sh to resolve versions)
-#   ref     : branch name (track that branch's latest commit) or "@release"
-#             (track the latest GitHub release). Flip a mod between the two by
-#             editing this field, then run ./update-mods.sh.
-#   folder  : target folder under Mods/ ("-" for the injector)
-#   version : resolved commit SHA or release tag   — written by ./update-mods.sh
-#   url     : resolved download endpoint           — written by ./update-mods.sh
+# One record per line:  name,type,url,ref,folder
+#   name   : display name / state-file key (must be unique)
+#   type   : "injector" — Lovely, a compiled release binary installed into the
+#            game directory (platform-matched asset picked by install.sh).
+#            "mod"      — plain Lua mod installed from a source tarball into
+#            Mods/<folder>/.
+#   url    : full repository URL. Currently all GitHub; to fetch from another
+#            git host, add its download-URL patterns to install.sh
+#            (source_tarball_url / release_asset_url).
+#   ref    : what to install —
+#              @release   latest release (most mods; best compatibility)
+#              <branch>   latest commit on that branch (repos without releases)
+#              <tag>      pin to an exact release  (rollback / compat freeze)
+#              <sha>      pin to an exact commit   (40-char hex)
+#   folder : target folder under Mods/ ("-" for the injector)
 #
-# The installers read ONLY version + url (+ folder/type); they never talk to
-# the GitHub API. To pick up new upstream versions run ./update-mods.sh and
-# commit the diff.
-#
-# Version policy: most mods track their latest GitHub release (@release) for
-# stability. A few track the HEAD of their default branch because the repo
-# ships no releases or tags them far behind the branch. Notable @release cases:
+# Version policy: most mods track their latest release (@release) for
+# stability; a few track a branch because the repo ships no releases. Notable:
 #   - lovely: ships a compiled binary only via GitHub Releases.
 #   - smods (Steamodded): its `main` is a development branch carrying an
 #     in-progress blind/scoring refactor content mods haven't adopted yet; the
 #     Steamodded team recommends the latest release for mod compatibility.
 #
 # Order: injector, then framework + common dependencies, then content mods.
-lovely,injector,ethangreen-dev/lovely-injector,@release,-,v0.9.0,https://github.com/ethangreen-dev/lovely-injector/releases/download/v0.9.0/{asset}
-smods,mod,Steamodded/smods,@release,smods,1.0.0-beta-1814a,https://github.com/Steamodded/smods/archive/refs/tags/1.0.0-beta-1814a.tar.gz
-Amulet,mod,frostice482/amulet,@release,Amulet,3.5.3,https://github.com/frostice482/amulet/archive/refs/tags/3.5.3.tar.gz
-JokerDisplay,mod,nh6574/JokerDisplay,@release,JokerDisplay,v1.10.7,https://github.com/nh6574/JokerDisplay/archive/refs/tags/v1.10.7.tar.gz
-Cartomancer,mod,stupxd/Cartomancer,@release,Cartomancer,v4.17c,https://github.com/stupxd/Cartomancer/archive/refs/tags/v4.17c.tar.gz
-Handy,mod,SleepyG11/HandyBalatro,@release,HandyBalatro,v1.5.1p,https://github.com/SleepyG11/HandyBalatro/archive/refs/tags/v1.5.1p.tar.gz
-Cryptid,mod,SpectralPack/Cryptid,@release,Cryptid,v0.5.16d,https://github.com/SpectralPack/Cryptid/archive/refs/tags/v0.5.16d.tar.gz
-unik,mod,70UNIK/UNIKs-mod,@release,UNIKs-mod,v0.6.3k,https://github.com/70UNIK/UNIKs-mod/archive/refs/tags/v0.6.3k.tar.gz
-Bunco,mod,jumbocarrot0/Bunco,@release,Bunco,v5.4.8b-JumboFork,https://github.com/jumbocarrot0/Bunco/archive/refs/tags/v5.4.8b-JumboFork.tar.gz
-AllInJest,mod,survovoaneend/All-In-Jest,@release,All-In-Jest,0.6.6b,https://github.com/survovoaneend/All-In-Jest/archive/refs/tags/0.6.6b.tar.gz
-BetterStakes,mod,kjossul/BetterStakes,main,BetterStakes,23c1c54652c36142fec2c56b54b051f7305caf68,https://github.com/kjossul/BetterStakes/archive/23c1c54652c36142fec2c56b54b051f7305caf68.tar.gz
-NeowBlessings,mod,aarons/Balatro-NeowBlessings,main,NeowBlessings,2518ac4f3bab75d0c2ca5fa84fc11c3d15054b67,https://github.com/aarons/Balatro-NeowBlessings/archive/2518ac4f3bab75d0c2ca5fa84fc11c3d15054b67.tar.gz
-typist,mod,kasimeka/balatro-typist-mod,@release,balatro-typist-mod,2.1.2,https://github.com/kasimeka/balatro-typist-mod/archive/refs/tags/2.1.2.tar.gz
-BUMod,mod,OceanRamen/BUMod,@release,BUMod,v1.4.0,https://github.com/OceanRamen/BUMod/archive/refs/tags/v1.4.0.tar.gz
-Blueprint,mod,stupxd/Blueprint,@release,Blueprint,v.3.3,https://github.com/stupxd/Blueprint/archive/refs/tags/v.3.3.tar.gz
-Malverk,mod,Eremel/Malverk,@release,Malverk,v1.1.4a,https://github.com/Eremel/Malverk/archive/refs/tags/v1.1.4a.tar.gz
-Saturn,mod,OceanRamen/Saturn,@release,Saturn,alpha-0.2.2-E-qf3,https://github.com/OceanRamen/Saturn/archive/refs/tags/alpha-0.2.2-E-qf3.tar.gz
-Pokermon,mod,InertSteak/Pokermon,@release,Pokermon,3.8.0,https://github.com/InertSteak/Pokermon/archive/refs/tags/3.8.0.tar.gz
-WhatsInMyFool,mod,colonthreeing/WhatsInMyFool,main,WhatsInMyFool,e0aa9632b628bb81b0dc752e71e064154fbbf72e,https://github.com/colonthreeing/WhatsInMyFool/archive/e0aa9632b628bb81b0dc752e71e064154fbbf72e.tar.gz
-ExtraCredit,mod,GuilloryCraft/ExtraCredit,main,ExtraCredit,1321784ab7cdec2b7a9be6f1cda454ffc015ec1f,https://github.com/GuilloryCraft/ExtraCredit/archive/1321784ab7cdec2b7a9be6f1cda454ffc015ec1f.tar.gz
+lovely,injector,https://github.com/ethangreen-dev/lovely-injector,@release,-
+smods,mod,https://github.com/Steamodded/smods,@release,smods
+Amulet,mod,https://github.com/frostice482/amulet,@release,Amulet
+JokerDisplay,mod,https://github.com/nh6574/JokerDisplay,@release,JokerDisplay
+Cartomancer,mod,https://github.com/stupxd/Cartomancer,@release,Cartomancer
+Handy,mod,https://github.com/SleepyG11/HandyBalatro,@release,HandyBalatro
+Cryptid,mod,https://github.com/SpectralPack/Cryptid,@release,Cryptid
+unik,mod,https://github.com/70UNIK/UNIKs-mod,@release,UNIKs-mod
+Bunco,mod,https://github.com/jumbocarrot0/Bunco,@release,Bunco
+AllInJest,mod,https://github.com/survovoaneend/All-In-Jest,@release,All-In-Jest
+BetterStakes,mod,https://github.com/kjossul/BetterStakes,main,BetterStakes
+NeowBlessings,mod,https://github.com/aarons/Balatro-NeowBlessings,main,NeowBlessings
+typist,mod,https://github.com/kasimeka/balatro-typist-mod,@release,balatro-typist-mod
+BUMod,mod,https://github.com/OceanRamen/BUMod,@release,BUMod
+Blueprint,mod,https://github.com/stupxd/Blueprint,@release,Blueprint
+Malverk,mod,https://github.com/Eremel/Malverk,@release,Malverk
+Saturn,mod,https://github.com/OceanRamen/Saturn,@release,Saturn
+Pokermon,mod,https://github.com/InertSteak/Pokermon,@release,Pokermon
+WhatsInMyFool,mod,https://github.com/colonthreeing/WhatsInMyFool,main,WhatsInMyFool
+ExtraCredit,mod,https://github.com/GuilloryCraft/ExtraCredit,main,ExtraCredit
