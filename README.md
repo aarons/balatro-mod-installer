@@ -8,25 +8,32 @@ list are removed from the Mods directory, so mods dropped from `mods.csv`
 
 ## Architecture
 
-The repo has one data file and three kinds of programs, each with a single job:
+The repo has one data file and a few programs, each with a single job:
 
 | File | Role |
 |---|---|
 | `mods.csv` | **The mod list** — one line per mod with its GitHub repo, tracked ref, resolved version, and download URL. The single source of truth for both installers. |
-| `update-mods.sh` | **Version discovery** — resolves the latest version of every entry (branch HEAD or latest release) and rewrites the `version`/`url` columns of `mods.csv`. The only program that talks to the GitHub API. |
+| `update-mods.sh` | **Version discovery** — resolves the latest version of every entry (branch HEAD or latest release) and rewrites the `version`/`url` columns of a mods.csv. The only program that talks to the GitHub API. |
 | `install-balatro-mods.sh` | **macOS installer** (native build, Lovely `dylib`). Reads `mods.csv`, downloads, installs. No version discovery. |
 | `install-balatro-mods-steamdeck.sh` | **Steam Deck / Linux installer** (Proton, Lovely `version.dll`). Same, for the Proton setup. |
-| `share.sh` | **Transfer** — serves the repo over the LAN; the Steam Deck curls the installer once, and the installer fetches `mods.csv` from this server on every run. |
+| `deck-update.sh` | **Deck orchestrator** — resolves latest versions (`update-mods.sh`) into a temp copy of `mods.csv`, then runs the Steam Deck installer against it. |
+| `update.sh` | **Static Deck bootstrap** — the only file that lives on the Deck. Downloads the latest repo snapshot from GitHub (one tarball, no git) and runs `deck-update.sh` from it, so the Deck always runs the newest code and mod list. |
+| `share.sh` | **First-time transfer** — serves the repo over the LAN so the Deck can curl `update.sh` once. Never needed again after that. |
 
-Typical maintenance flow:
+Typical flow:
 
 ```bash
+# macOS (this repo checked out):
 ./update-mods.sh                     # resolve latest versions into mods.csv
-git diff mods.csv                    # review what moved
-git commit -am "chore: bump mod versions"
+./install-balatro-mods.sh            # install / update everything
 
-./install-balatro-mods.sh            # macOS:      install / update everything
-./install-balatro-mods-steamdeck.sh  # Steam Deck:  install / update everything
+# Steam Deck (one static script, everything else comes from GitHub):
+./update.sh                          # fetch latest code + list, resolve, install
+
+# committing the refreshed mods.csv is optional — the Deck resolves latest
+# versions itself on every run; the committed values are just the fallback
+# when resolution fails:
+git diff mods.csv && git commit -am "chore: bump mod versions"
 
 # both installers take the same flags:
 #   --status      report installed vs mods.csv (no changes)
@@ -117,7 +124,7 @@ or the `--game-dir` / `--mods-dir` flags.
   the script. No `jq`/Python/`git` needed.
 - **Installers — Steam Deck / Linux**: `curl`, `tar`, one of `unzip` /
   `bsdtar` / `python3` to unpack Lovely's Windows `.zip` (all stock on
-  SteamOS). `mods.csv` is fetched from the share endpoint automatically.
+  SteamOS). `update.sh` fetches `mods.csv` (and everything else) from GitHub.
 - **`update-mods.sh`**: `curl`; prefers `git` (via `git ls-remote`) to resolve
   branch versions without hitting GitHub's REST API rate limit, falling back
   to the REST API (anonymous: 60 requests/hour — fine for a single run of ~12
@@ -134,8 +141,9 @@ compares it against the version pinned in `mods.csv`:
 - recorded version ≠ mods.csv → **update** (folder is replaced atomically)
 - recorded version == mods.csv and folder present → **up to date**, skipped
 
-"Latest" therefore means "latest as of the last `./update-mods.sh` run" — the
-installers are fully deterministic given a `mods.csv`.
+The installers are fully deterministic given a `mods.csv`. On the Deck,
+`update.sh` re-resolves latest versions on every run, so "latest" means "latest
+right now"; on macOS it means "latest as of the last `./update-mods.sh` run".
 
 > Updating replaces a mod's folder with the latest version. If you've hand-edited
 > a mod's in-folder config, it will be reset to that mod's default.
@@ -166,23 +174,28 @@ sh "$HOME/Library/Application Support/Steam/steamapps/common/Balatro/run_lovely_
 
 ## Steam Deck / Linux (Proton)
 
-Use `install-balatro-mods-steamdeck.sh`. Run `./share.sh` on the Mac, then in
-**Desktop Mode** on the Deck open Konsole and run the one-liner it prints:
+One-time setup — in **Desktop Mode** on the Deck, open Konsole and run:
 
 ```bash
-curl -fO http://<mac-ip>:8000/install-balatro-mods-steamdeck.sh \
-  && bash install-balatro-mods-steamdeck.sh
+curl -fO https://raw.githubusercontent.com/aarons/balatro-mod-installer/main/update.sh
+chmod +x update.sh
 ```
 
-The installer fetches `mods.csv` from the share endpoint by itself (hardcoded
-default `http://192.168.1.16:8000`; override with `--share-url` or
-`BALATRO_SHARE_URL`) and caches it next to the script, so re-running works even
-if the Mac is offline — it just uses the last-fetched list. Useful flags:
+(Or run `./share.sh` on the Mac and use the LAN one-liner it prints — same
+result, handy if you'd rather grab it from the Mac than from GitHub.)
+
+From then on, updating everything is a single command — no Mac, no LAN server:
 
 ```bash
-bash install-balatro-mods-steamdeck.sh --status   # report only
-bash install-balatro-mods-steamdeck.sh --force    # reinstall everything
+./update.sh             # latest code + mod list from GitHub, resolve, install
+./update.sh --status    # report only (flags pass through to the installer)
+./update.sh --force     # reinstall everything
 ```
+
+`update.sh` is a small static bootstrap: it downloads the current repo snapshot
+from GitHub and runs `deck-update.sh` from it, which resolves each mod's latest
+version and then runs `install-balatro-mods-steamdeck.sh`. Since it fetches
+fresh code every run, the copy on the Deck never needs updating itself.
 
 On Linux there is **no native Balatro build** — Steam runs the *Windows* game
 through Proton. The script accounts for this; the differences from the macOS

@@ -2,31 +2,28 @@
 #
 # update.sh
 #
-# Lives on the STEAM DECK. Downloads the latest Steam Deck installer from
-# the Mac (which must be running ./share.sh) and runs it locally.
+# Lives on the STEAM DECK. This is a small STATIC bootstrap: it downloads the
+# latest snapshot of the repo from GitHub (one tarball, no git needed), then
+# hands off to deck-update.sh from that snapshot, which resolves the latest
+# mod versions and runs the installer. All logic that evolves lives in the
+# repo; this file should almost never need to change.
 #
-# One-time setup on the Deck (with share.sh running on the Mac):
+# One-time setup on the Deck (Desktop Mode, Konsole):
 #
-#   curl -fO http://192.168.1.69:8000/update.sh && chmod +x update.sh
+#   curl -fO https://raw.githubusercontent.com/aarons/balatro-mod-installer/main/update.sh
+#   chmod +x update.sh
 #
-# After that, updating is just:
+# After that, updating everything is just:
 #
-#   ./update.sh               # download latest installer and run it
+#   ./update.sh               # fetch latest code + mod list, resolve, install
 #   ./update.sh --status      # flags are passed through to the installer
 #   ./update.sh --force
 #
 set -u
 
-# ---------------------------------------------------------------------------
-# Configuration -- hard-coded to the Mac's (usually fixed) LAN address.
-# If the Mac's IP changes, edit HOST below, or override per-run:
-#   BALATRO_HOST=192.168.1.42 ./update.sh
-# ---------------------------------------------------------------------------
-
-HOST="${BALATRO_HOST:-192.168.1.69}"
-PORT="${BALATRO_PORT:-8000}"
-INSTALLER="install-balatro-mods-steamdeck.sh"
-URL="http://$HOST:$PORT/$INSTALLER"
+REPO="${BALATRO_REPO:-aarons/balatro-mod-installer}"
+BRANCH="${BALATRO_BRANCH:-main}"
+TARBALL_URL="https://github.com/$REPO/archive/refs/heads/$BRANCH.tar.gz"
 
 # ---------------------------------------------------------------------------
 # Pretty output (mirrors the installer's style)
@@ -44,28 +41,33 @@ fail() { printf '  %s[ERR]%s  %s\n' "$C_RED" "$C_RESET" "$*"; }
 note() { printf '         %s%s%s\n' "$C_DIM" "$*" "$C_RESET"; }
 
 # ---------------------------------------------------------------------------
-# Fetch the latest installer
+# Fetch the latest repo snapshot
 # ---------------------------------------------------------------------------
 
-TMP="$(mktemp /tmp/${INSTALLER}.XXXXXX)"
-trap 'rm -f "$TMP"' EXIT
+WORK_DIR="$(mktemp -d /tmp/balatro-mod-installer.XXXXXX)"
+trap 'rm -rf "$WORK_DIR"' EXIT INT TERM
 
 echo
-printf '%s\n' "${C_BOLD}Fetching latest installer from $URL${C_RESET}"
+printf '%s\n' "${C_BOLD}Fetching latest $REPO ($BRANCH) from GitHub${C_RESET}"
 
-if ! curl -fsS --connect-timeout 5 -o "$TMP" "$URL"; then
-  fail "Could not download the installer from $HOST."
-  note "Is ./share.sh running on the Mac?"
-  note "Is the Deck on the same Wi-Fi/network?"
-  note "If the Mac's IP changed, edit HOST at the top of this script."
+if ! curl -fsSL --connect-timeout 10 "$TARBALL_URL" \
+     | tar -xz -C "$WORK_DIR" --strip-components=1; then
+  fail "Could not download $TARBALL_URL"
+  note "Is the Deck online? Is github.com reachable?"
   exit 1
 fi
 
-ok "Downloaded $(wc -c <"$TMP" | tr -d ' ') bytes."
+if [ ! -f "$WORK_DIR/deck-update.sh" ]; then
+  fail "deck-update.sh missing from the downloaded snapshot — repo layout changed?"
+  exit 1
+fi
+
+ok "Got latest scripts and mod list."
 
 # ---------------------------------------------------------------------------
-# Run it (any flags given to update.sh are passed straight through)
+# Hand off (any flags given to update.sh are passed straight through)
 # ---------------------------------------------------------------------------
 
 echo
-bash "$TMP" "$@"
+bash "$WORK_DIR/deck-update.sh" "$@"
+exit $?

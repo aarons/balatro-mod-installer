@@ -2,7 +2,9 @@
 #
 # share.sh
 #
-# Serve this repo over the LAN so a Steam Deck can curl the installer.
+# ONE-TIME bootstrap transfer: serve this repo over the LAN so a Steam Deck
+# can curl update.sh (the static updater). After that first transfer the Deck
+# never needs this again -- update.sh fetches everything from GitHub.
 # Run it on your Mac (in the repo dir), then follow the printed instructions
 # on the Deck. The HTTP server runs in the FOREGROUND -- press Ctrl-C (or
 # kill this script) and the server stops with it. Nothing is left running.
@@ -19,12 +21,7 @@ set -u
 # ---------------------------------------------------------------------------
 
 PORT="${1:-8000}"
-INSTALLER="install-balatro-mods-steamdeck.sh"
-MODS_FILE="mods.csv"
-
-# The endpoint hardcoded in the Steam Deck installer. If this machine's actual
-# address differs, the printed command includes a --share-url override.
-DEFAULT_ENDPOINT="http://192.168.1.16:8000"
+UPDATER="update.sh"
 
 # Serve from the directory this script lives in (the repo), regardless of CWD.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -55,13 +52,8 @@ command -v python3 >/dev/null 2>&1 || {
   exit 1
 }
 
-[ -f "$INSTALLER" ] || {
-  fail "$INSTALLER not found in $SCRIPT_DIR -- run this from the repo."
-  exit 1
-}
-
-[ -f "$MODS_FILE" ] || {
-  fail "$MODS_FILE not found in $SCRIPT_DIR -- the installer needs it."
+[ -f "$UPDATER" ] || {
+  fail "$UPDATER not found in $SCRIPT_DIR -- run this from the repo."
   exit 1
 }
 
@@ -102,21 +94,17 @@ note "(Deck must be on the same Wi-Fi/network as this Mac.)"
 echo
 printf '  %s1.%s Switch to Desktop Mode, then open %sKonsole%s.\n' "$C_BOLD" "$C_RESET" "$C_BOLD" "$C_RESET"
 echo
-printf '  %s2.%s Download the installer and run it:\n' "$C_BOLD" "$C_RESET"
+printf '  %s2.%s Download the updater and run it:\n' "$C_BOLD" "$C_RESET"
 echo
-EXTRA_FLAGS=""
-[ "$BASE" != "$DEFAULT_ENDPOINT" ] && EXTRA_FLAGS=" --share-url $BASE"
-printf '       %scurl -fO %s/%s && bash %s%s%s\n' \
-  "$C_GREEN" "$BASE" "$INSTALLER" "$INSTALLER" "$EXTRA_FLAGS" "$C_RESET"
+printf '       %scurl -fO %s/%s && chmod +x %s && ./%s%s\n' \
+  "$C_GREEN" "$BASE" "$UPDATER" "$UPDATER" "$UPDATER" "$C_RESET"
 echo
-note "(The installer fetches $MODS_FILE from this server by itself.)"
-if [ -n "$EXTRA_FLAGS" ]; then
-  note "NOTE: this machine is not at $DEFAULT_ENDPOINT (the installer's default),"
-  note "so the command passes --share-url with the current address."
-fi
-note "Add installer flags after the filename, e.g.:"
-note "  bash $INSTALLER --status      # report only, change nothing"
-note "  bash $INSTALLER --force       # reinstall everything"
+note "(update.sh fetches everything else -- scripts and mod list -- from"
+note "GitHub, so this transfer is only needed ONCE. From then on, updating"
+note "is just ./update.sh on the Deck; this server need not be running.)"
+note "Flags pass through to the installer, e.g.:"
+note "  ./$UPDATER --status      # report only, change nothing"
+note "  ./$UPDATER --force       # reinstall everything"
 echo
 hr
 title "Server running -- press ${C_BOLD}Ctrl-C${C_RESET} to stop sharing."

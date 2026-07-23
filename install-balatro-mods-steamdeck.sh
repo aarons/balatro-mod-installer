@@ -5,11 +5,11 @@
 # Installer / updater for a curated set of Balatro mods on a Steam Deck
 # (or any Linux box where Balatro runs through Proton/Wine).
 # The mod list — and the exact version + download URL of each component —
-# lives in mods.csv. On each run this script fetches the latest mods.csv
-# from the share endpoint (share.sh running on the Mac) and caches it next
-# to itself; if the endpoint is unreachable, the cached copy is used.
-# This script does no version discovery of its own; ./update-mods.sh (run
-# on the machine that maintains the repo) refreshes mods.csv.
+# lives in mods.csv (next to this script by default, or via --mods-file).
+# This script does no version discovery of its own; ./update-mods.sh
+# refreshes a mods.csv. On the Deck the normal entry point is ./update.sh,
+# which fetches the latest repo snapshot from GitHub, resolves the latest
+# versions, and runs this installer — see deck-update.sh.
 # Re-running is safe: it compares the installed version of each component
 # against mods.csv and only downloads what is missing or stale.
 # Folders in the Mods directory that aren't listed in mods.csv are REMOVED,
@@ -19,12 +19,12 @@
 #   ./install-balatro-mods-steamdeck.sh --status   # report only, change nothing
 #   ./install-balatro-mods-steamdeck.sh --force    # reinstall everything from scratch
 #   ./install-balatro-mods-steamdeck.sh --keep-extra   # don't remove unlisted mod folders
-#   ./install-balatro-mods-steamdeck.sh --share-url http://<ip>:<port>   # other endpoint
+#   ./install-balatro-mods-steamdeck.sh --mods-file /path/to/mods.csv
 #   ./install-balatro-mods-steamdeck.sh --help
 #
 # Requirements: Linux, curl, tar, one of {unzip, bsdtar, python3} (Lovely's
-# Windows build ships as a .zip). mods.csv is fetched automatically (or use a
-# local list with --mods-file). All tools are stock on SteamOS; no jq/git needed.
+# Windows build ships as a .zip). All tools are stock on SteamOS; no jq/git
+# needed.
 #
 # IMPORTANT — this is the Proton/Wine build. On Linux/Steam Deck, Balatro has no
 # native build; Steam runs the *Windows* game through Proton. So:
@@ -55,15 +55,8 @@ DEFAULT_GAME_DIR="$DEFAULT_STEAM_ROOT/steamapps/common/Balatro"
 GAME_DIR="${BALATRO_GAME_DIR:-}"
 MODS_DIR="${BALATRO_MODS_DIR:-}"
 
-# Where to fetch the latest mods.csv from on each run: share.sh running on the
-# Mac. Override with BALATRO_SHARE_URL or --share-url. If the endpoint is
-# unreachable, the previously fetched mods.csv next to this script is used.
-SHARE_URL="${BALATRO_SHARE_URL:-http://192.168.1.16:8000}"
-
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MODS_FILE="${BALATRO_MODS_FILE:-$SCRIPT_DIR/mods.csv}"
-# When the user supplies their own mod list (env or --mods-file), don't fetch.
-MODS_FILE_LOCAL=0; [ -n "${BALATRO_MODS_FILE:-}" ] && MODS_FILE_LOCAL=1
 
 # ---------------------------------------------------------------------------
 # Flags
@@ -80,8 +73,7 @@ while [ $# -gt 0 ]; do
     --keep-extra) KEEP_EXTRA=1 ;;
     --game-dir) shift; GAME_DIR="${1:-}" ;;
     --mods-dir) shift; MODS_DIR="${1:-}" ;;
-    --mods-file) shift; MODS_FILE="${1:-}"; MODS_FILE_LOCAL=1 ;;
-    --share-url) shift; SHARE_URL="${1:-}" ;;
+    --mods-file) shift; MODS_FILE="${1:-}" ;;
     -h|--help)
       # Print the leading comment block (skip the shebang, stop at the first
       # non-comment line), stripping the leading "# ".
@@ -255,34 +247,14 @@ preflight() {
   fi
 
   # --- Mod list --------------------------------------------------------------
-  # Fetch the latest mods.csv from the share endpoint; fall back to the cached
-  # copy from a previous run if the Mac isn't reachable.
-  if [ "$MODS_FILE_LOCAL" = 0 ]; then
-    local mods_url="$SHARE_URL/mods.csv" tmp="$MODS_FILE.tmp.$$"
-    if curl -fsSL --connect-timeout 5 "$mods_url" -o "$tmp" 2>/dev/null; then
-      mv "$tmp" "$MODS_FILE"
-      note "mod list : fetched $mods_url"
-    else
-      rm -f "$tmp"
-      if [ -f "$MODS_FILE" ]; then
-        note "warning  : could not reach $mods_url"
-        note "           using cached copy: $MODS_FILE"
-      else
-        fail "Could not fetch mods.csv from $mods_url (and no cached copy exists)."
-        note "Is share.sh running on the Mac, and is the Deck on the same Wi-Fi?"
-        note "If the Mac's address changed:  $0 --share-url http://<ip>:<port>"
-        note "Or use a local list:           $0 --mods-file /path/to/mods.csv"
-        exit 1
-      fi
-    fi
-  else
-    if [ ! -f "$MODS_FILE" ]; then
-      fail "mods.csv not found."
-      note "Expected: $MODS_FILE"
-      exit 1
-    fi
-    note "mod list : $MODS_FILE"
+  if [ ! -f "$MODS_FILE" ]; then
+    fail "mods.csv not found."
+    note "Expected: $MODS_FILE"
+    note "On the Deck, run ./update.sh — it fetches the repo (including"
+    note "mods.csv) from GitHub and runs this installer for you."
+    exit 1
   fi
+  note "mod list : $MODS_FILE"
 
   # --- Game directory -------------------------------------------------------
   if [ -z "$GAME_DIR" ]; then
@@ -558,9 +530,9 @@ ${C_DIM}Notes:
     folder to exist; this run found it, so you're set.
   - Amulet replaces Talisman (big-number scaling). Don't also install Talisman.
   - Cryptid requires Steamodded + Amulet (both included above).
-  - Versions come from mods.csv, fetched from $SHARE_URL on each run.
-    Refresh it with ./update-mods.sh on the Mac (with share.sh running),
-    then simply re-run this script to pick up new releases.${C_RESET}
+  - To pick up new mod releases later, just run ./update.sh again — it
+    fetches the latest scripts + mod list from GitHub, resolves the newest
+    versions, and re-runs this installer.${C_RESET}
 EOF
 fi
 
