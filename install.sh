@@ -10,8 +10,8 @@
 # versions). This script resolves each mod's ref to a concrete version at
 # run time (latest release tag, or a branch's latest commit), then downloads
 # and installs whatever is missing or stale. Re-running is always safe.
-# Folders in the Mods directory that aren't in the list are REMOVED, so
-# dropped mods don't linger (pass --keep-extra to keep them).
+# Folders in the Mods directory that aren't in the list are KEPT by default
+# (pass --remove-extra to have dropped mods removed instead).
 #
 # Where the mod list comes from:
 #   - mods.csv next to this script, if present (a repo checkout)   [default]
@@ -23,7 +23,7 @@
 #   ./install.sh                  # install/update everything
 #   ./install.sh --status         # report installed vs latest, change nothing
 #   ./install.sh --force          # reinstall everything from scratch
-#   ./install.sh --keep-extra     # don't remove unlisted mod folders
+#   ./install.sh --remove-extra   # remove unlisted mod folders (default: keep)
 #   ./install.sh --remote         # fetch mods.csv from GitHub even in a checkout
 #   ./install.sh --mods-file F    # use a specific mod list
 #   ./install.sh --no-self-update # skip the self-update check (remote mode)
@@ -72,7 +72,7 @@ ORIG_ARGS=("$@")   # preserved for re-exec after self-update
 
 MODE="install"     # install | status
 FORCE=0
-KEEP_EXTRA=0
+KEEP_EXTRA=1
 REMOTE=0
 SELF_UPDATE=1
 
@@ -80,7 +80,7 @@ while [ $# -gt 0 ]; do
   case "$1" in
     --status|--check) MODE="status" ;;
     --force) FORCE=1 ;;
-    --keep-extra) KEEP_EXTRA=1 ;;
+    --remove-extra) KEEP_EXTRA=0 ;;
     --remote) REMOTE=1 ;;
     --no-self-update) SELF_UPDATE=0 ;;
     --game-dir) shift; GAME_DIR="${1:-}" ;;
@@ -739,9 +739,13 @@ prune_unmanaged() {
     printf '%s\n' "$managed" | grep -qxF "$base" && continue
 
     if [ "$MODE" = "status" ]; then
-      del "$base (not in the mod list — would be removed)"
+      if [ "$KEEP_EXTRA" = 1 ]; then
+        note "keeping unlisted folder: $base"
+      else
+        del "$base (not in the mod list — would be removed)"
+      fi
     elif [ "$KEEP_EXTRA" = 1 ]; then
-      note "keeping unlisted folder: $base (--keep-extra)"
+      note "keeping unlisted folder: $base"
     else
       if rm -rf "$MODS_DIR/$base"; then
         del "$base (removed — not in the mod list)"

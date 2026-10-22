@@ -3,8 +3,9 @@
 A single command that installs and updates a curated set of Balatro mods.
 Re-running it checks each component's installed version against the list and
 only downloads what's missing or out of date. Mod folders that aren't in the
-list are removed from the Mods directory, so mods dropped from `mods.csv`
-(or installed by hand) don't linger — pass `--keep-extra` to keep them.
+list are kept in the Mods directory by default, so hand-installed or
+experiments mods won't be deleted — pass `--remove-extra` to remove them
+instead.
 
 ## Architecture
 
@@ -13,7 +14,7 @@ The repo is one data file and two programs:
 | File | Role |
 |---|---|
 | `mods.csv` | **The mod list** — one hand-edited line per mod: `name,type,url,ref,folder`. No pinned versions; `ref` says *what to track* (`@release`, a branch, or an explicit tag/SHA pin). |
-| `install.sh` | **The installer** — everything else. Detects the platform (macOS native / Steam Deck Proton), resolves each mod's `ref` to a concrete version at run time, downloads, installs, prunes. On the Deck (no local `mods.csv`) it fetches the list from GitHub and keeps *itself* up to date from the repo before running. |
+| `install.sh` | **The installer** — everything else. Detects the platform (macOS native / Steam Deck Proton), resolves each mod's `ref` to a concrete version at run time, downloads, installs. On the Deck (no local `mods.csv`) it fetches the list from GitHub and keeps *itself* up to date from the repo before running. |
 | `share.sh` | **First-time Deck transfer** — serves the repo over the LAN so a new Steam Deck can curl `install.sh` once without typing a GitHub URL. Never needed again after that. |
 
 Typical use — the same zero-flag command everywhere:
@@ -29,7 +30,7 @@ Typical use — the same zero-flag command everywhere:
 # common flags:
 #   --status        report installed vs latest, change nothing
 #   --force         reinstall everything from scratch
-#   --keep-extra    don't remove unlisted mod folders
+#   --remove-extra  remove unlisted mod folders (default: keep them)
 #   --remote        fetch mods.csv from GitHub even in a checkout
 #   --mods-file F   use a specific mod list
 #   --no-self-update
